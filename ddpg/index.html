@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Deterministic Policy Gradient — An Interactive Guide</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<article>
+
+  <!-- ───────── Hero ───────── -->
+  <header class="hero">
+    <div class="hero-inner">
+      <h1>Deep Deterministic Policy Gradient</h1>
+      <p class="lead">An interactive visual guide to continuous-action reinforcement learning</p>
+    </div>
+  </header>
+
+  <!-- ───────── Intro ───────── -->
+  <section class="prose" id="sec-intro">
+    <h2>Why DDPG?</h2>
+    <p>
+      Most reinforcement learning algorithms — like DQN or REINFORCE — work with
+      <em>discrete</em> actions: move left, move right, jump. But many real-world
+      control problems have <strong>continuous</strong> action spaces: how much
+      torque to apply, what angle to steer, how hard to accelerate.
+    </p>
+    <p>
+      You can't just enumerate every possible torque value and pick the best one.
+      <strong>DDPG</strong> (Lillicrap et al., 2015) solves this by combining two
+      ideas: <em>deterministic policy gradients</em> and <em>deep Q-learning</em>,
+      producing an actor-critic algorithm purpose-built for continuous control.
+    </p>
+    <div class="callout">
+      <strong>Key idea:</strong> Instead of outputting probabilities over actions,
+      the policy network directly outputs the action value — a real number (or vector).
+      A separate critic network learns to evaluate how good that action is.
+    </div>
+  </section>
+
+  <!-- ───────── The Big Picture ───────── -->
+  <section class="prose" id="sec-overview">
+    <h2>The Big Picture</h2>
+    <p>DDPG has four neural networks working together. Click each component to highlight its role:</p>
+    <div class="viz-container">
+      <canvas id="arch-canvas" width="760" height="420"></canvas>
+      <div id="arch-caption" class="viz-caption">Click a component above to learn about its role.</div>
+    </div>
+    <p>
+      The <em>actor</em> picks actions; the <em>critic</em> evaluates them.
+      The <em>target networks</em> are slowly-updated copies that stabilize
+      training — without them, the critic would be chasing a moving target.
+    </p>
+  </section>
+
+  <!-- ───────── Actor-Critic ───────── -->
+  <section class="prose" id="sec-actor-critic">
+    <h2>Actor-Critic Intuition</h2>
+    <p>
+      Think of the actor as a <strong>student</strong> and the critic as a
+      <strong>teacher</strong>. The student proposes an action; the teacher
+      grades it. Over time the student learns to propose better actions,
+      and the teacher gets better at grading.
+    </p>
+    <div class="viz-container">
+      <canvas id="ac-canvas" width="760" height="320"></canvas>
+      <div class="controls-row">
+        <button id="ac-step-btn">Step</button>
+        <button id="ac-auto-btn">Auto-play</button>
+        <button id="ac-reset-btn">Reset</button>
+        <span id="ac-status" class="status-text">Click Step to begin</span>
+      </div>
+    </div>
+    <p>
+      The visualization above shows a 1D continuous control task: the actor must
+      learn the optimal action (position on the x-axis) that maximizes the critic's
+      Q-value landscape. Watch how the actor's output converges toward the peak.
+    </p>
+  </section>
+
+  <!-- ───────── Replay Buffer ───────── -->
+  <section class="prose" id="sec-replay">
+    <h2>Experience Replay</h2>
+    <p>
+      DDPG stores every transition <code>(s, a, r, s')</code> in a
+      <strong>replay buffer</strong>. During training, it samples random
+      mini-batches — this breaks correlation between consecutive samples
+      and lets each experience be reused many times.
+    </p>
+    <div class="viz-container">
+      <canvas id="replay-canvas" width="760" height="280"></canvas>
+      <div class="controls-row">
+        <button id="replay-add-btn">Add Experience</button>
+        <button id="replay-sample-btn">Sample Batch</button>
+        <button id="replay-reset-btn">Reset</button>
+        <span id="replay-status" class="status-text">Buffer empty</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Target Networks ───────── -->
+  <section class="prose" id="sec-targets">
+    <h2>Soft Target Updates</h2>
+    <p>
+      DQN copies weights to the target network every <em>N</em> steps (a hard update).
+      DDPG uses a <strong>soft update</strong> — blending a tiny fraction &tau; of the
+      online weights into the target at every step:
+    </p>
+    <div class="equation">
+      &theta;' &larr; &tau;&theta; + (1 &minus; &tau;)&theta;'
+    </div>
+    <p>
+      The slider below lets you see how different &tau; values affect how quickly
+      the target tracks the online network. Typical values are &tau; &asymp; 0.005.
+    </p>
+    <div class="viz-container">
+      <canvas id="tau-canvas" width="760" height="260"></canvas>
+      <div class="controls-row">
+        <label>
+          &tau; = <span id="tau-val">0.005</span>
+          <input id="tau-slider" type="range" min="1" max="500" value="5">
+        </label>
+        <button id="tau-play-btn">Play</button>
+        <button id="tau-reset-btn">Reset</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Exploration Noise ───────── -->
+  <section class="prose" id="sec-noise">
+    <h2>Exploration Noise</h2>
+    <p>
+      Because the policy is deterministic, it would always take the same action
+      in the same state — no exploration! DDPG adds noise to the action during
+      training. The original paper uses <strong>Ornstein-Uhlenbeck</strong>
+      noise (temporally correlated), though simple Gaussian noise often works too.
+    </p>
+    <div class="viz-container">
+      <canvas id="noise-canvas" width="760" height="240"></canvas>
+      <div class="controls-row">
+        <label>
+          Type:
+          <select id="noise-type">
+            <option value="ou">Ornstein-Uhlenbeck</option>
+            <option value="gaussian">Gaussian</option>
+          </select>
+        </label>
+        <label>
+          &sigma; = <span id="noise-sigma-val">0.20</span>
+          <input id="noise-sigma" type="range" min="1" max="100" value="20">
+        </label>
+        <button id="noise-regen-btn">Regenerate</button>
+      </div>
+    </div>
+    <p>
+      Notice how OU noise has <em>momentum</em> — it tends to continue in the same
+      direction — while Gaussian noise is independent at each step. OU can be
+      better for physical control tasks where jerky exploration is undesirable.
+    </p>
+  </section>
+
+  <!-- ───────── The Algorithm ───────── -->
+  <section class="prose" id="sec-algorithm">
+    <h2>The Full Algorithm</h2>
+    <p>Here's DDPG step by step. Click each phase to see it animated below:</p>
+
+    <div id="algo-steps">
+      <div class="algo-step" data-step="0">
+        <div class="algo-num">1</div>
+        <div class="algo-body">
+          <strong>Observe</strong> state <em>s</em> from the environment
+        </div>
+      </div>
+      <div class="algo-step" data-step="1">
+        <div class="algo-num">2</div>
+        <div class="algo-body">
+          <strong>Select action</strong> <em>a = &mu;(s) + noise</em> using actor + exploration noise
+        </div>
+      </div>
+      <div class="algo-step" data-step="2">
+        <div class="algo-num">3</div>
+        <div class="algo-body">
+          <strong>Execute</strong> action, observe reward <em>r</em> and next state <em>s'</em>
+        </div>
+      </div>
+      <div class="algo-step" data-step="3">
+        <div class="algo-num">4</div>
+        <div class="algo-body">
+          <strong>Store</strong> transition <em>(s, a, r, s')</em> in replay buffer
+        </div>
+      </div>
+      <div class="algo-step" data-step="4">
+        <div class="algo-num">5</div>
+        <div class="algo-body">
+          <strong>Sample</strong> mini-batch from replay buffer
+        </div>
+      </div>
+      <div class="algo-step" data-step="5">
+        <div class="algo-num">6</div>
+        <div class="algo-body">
+          <strong>Update critic</strong>: minimize <em>(Q(s,a) &minus; (r + &gamma;Q'(s', &mu;'(s'))))&sup2;</em>
+        </div>
+      </div>
+      <div class="algo-step" data-step="6">
+        <div class="algo-num">7</div>
+        <div class="algo-body">
+          <strong>Update actor</strong>: maximize <em>Q(s, &mu;(s))</em> via &nabla;<sub>a</sub>Q &middot; &nabla;<sub>&theta;</sub>&mu;
+        </div>
+      </div>
+      <div class="algo-step" data-step="7">
+        <div class="algo-num">8</div>
+        <div class="algo-body">
+          <strong>Soft-update</strong> target networks: &theta;' &larr; &tau;&theta; + (1&minus;&tau;)&theta;'
+        </div>
+      </div>
+    </div>
+
+    <div class="viz-container">
+      <canvas id="algo-canvas" width="760" height="340"></canvas>
+      <div id="algo-caption" class="viz-caption">Click a step above to see it visualized.</div>
+    </div>
+  </section>
+
+  <!-- ───────── Live Demo ───────── -->
+  <section class="prose" id="sec-demo">
+    <h2>Live Demo: 2D Reacher</h2>
+    <p>
+      Watch DDPG learn a simple 2D reacher task: a two-joint arm must reach a target
+      position. The actor outputs two continuous torques; the critic evaluates
+      how close the arm gets to the goal.
+    </p>
+    <div class="viz-container wide-viz">
+      <div class="demo-layout">
+        <canvas id="reacher-canvas" width="400" height="400"></canvas>
+        <div class="demo-sidebar">
+          <div class="demo-metric">
+            <span class="metric-label">Episode</span>
+            <span class="metric-value" id="demo-episode">0</span>
+          </div>
+          <div class="demo-metric">
+            <span class="metric-label">Avg Reward</span>
+            <span class="metric-value" id="demo-reward">0.0</span>
+          </div>
+          <div class="demo-metric">
+            <span class="metric-label">Buffer Size</span>
+            <span class="metric-value" id="demo-buffer">0</span>
+          </div>
+          <div class="demo-metric">
+            <span class="metric-label">Critic Loss</span>
+            <span class="metric-value" id="demo-closs">—</span>
+          </div>
+          <canvas id="demo-reward-chart" width="340" height="140"></canvas>
+          <canvas id="demo-action-chart" width="340" height="100"></canvas>
+          <div class="controls-row">
+            <button id="demo-train-btn">Train</button>
+            <button id="demo-pause-btn" disabled>Pause</button>
+            <button id="demo-reset-btn">Reset</button>
+            <label>
+              Speed
+              <input id="demo-speed" type="range" min="1" max="30" value="5">
+              <span id="demo-speed-val">5x</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Comparison ───────── -->
+  <section class="prose" id="sec-comparison">
+    <h2>DDPG vs Other Algorithms</h2>
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>DQN</th>
+          <th>REINFORCE</th>
+          <th>DDPG</th>
+          <th>TD3 / SAC</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Action space</td>
+          <td>Discrete</td>
+          <td>Discrete / Cont.</td>
+          <td class="highlight">Continuous</td>
+          <td>Continuous</td>
+        </tr>
+        <tr>
+          <td>Policy type</td>
+          <td>Implicit (argmax Q)</td>
+          <td>Stochastic</td>
+          <td class="highlight">Deterministic</td>
+          <td>Deterministic / Stoch.</td>
+        </tr>
+        <tr>
+          <td>Replay buffer</td>
+          <td>Yes</td>
+          <td>No</td>
+          <td class="highlight">Yes</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Off-policy</td>
+          <td>Yes</td>
+          <td>No</td>
+          <td class="highlight">Yes</td>
+          <td>Yes</td>
+        </tr>
+        <tr>
+          <td>Target networks</td>
+          <td>Hard update</td>
+          <td>None</td>
+          <td class="highlight">Soft update (&tau;)</td>
+          <td>Soft update (&tau;)</td>
+        </tr>
+        <tr>
+          <td>Exploration</td>
+          <td>&epsilon;-greedy</td>
+          <td>Policy entropy</td>
+          <td class="highlight">Action noise (OU/Gauss)</td>
+          <td>Noise / entropy bonus</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>
+      <strong>TD3</strong> (Twin Delayed DDPG) and <strong>SAC</strong> (Soft Actor-Critic)
+      are successors that fix DDPG's overestimation and brittleness issues — but
+      DDPG remains the conceptual foundation for modern continuous-control RL.
+    </p>
+  </section>
+
+  <!-- ───────── Takeaways ───────── -->
+  <section class="prose" id="sec-takeaways">
+    <h2>Key Takeaways</h2>
+    <ol class="takeaway-list">
+      <li>DDPG extends DQN-style value learning to <strong>continuous actions</strong> by pairing a deterministic actor with a Q-value critic.</li>
+      <li>The <strong>actor</strong> is trained by following the critic's gradient: push the action in whatever direction increases Q.</li>
+      <li>The <strong>critic</strong> is trained with Bellman error, using target networks for stability.</li>
+      <li><strong>Soft target updates</strong> (&tau; blending) prevent the oscillations that hard copies would cause.</li>
+      <li><strong>Replay buffers</strong> decorrelate samples and improve data efficiency.</li>
+      <li><strong>Exploration noise</strong> (OU or Gaussian) is essential because the policy is deterministic.</li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>An interactive explanation of DDPG &middot; Built with vanilla JavaScript and Canvas</p>
+  </footer>
+
+</article>
+
+<script src="visualizations.js"></script>
+</body>
+</html>
