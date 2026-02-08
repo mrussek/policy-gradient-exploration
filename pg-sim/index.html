@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Policy Gradient - Asteroids</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Policy Gradient &mdash; Asteroids</h1>
+      <p class="subtitle">Watch a neural network learn to play Asteroids using REINFORCE</p>
+    </header>
+    <div id="main-content">
+      <div id="game-panel">
+        <canvas id="game-canvas" width="480" height="480"></canvas>
+        <div id="game-hud">
+          <span>Episode: <strong id="hud-episode">0</strong></span>
+          <span>Score: <strong id="hud-score">0</strong></span>
+          <span>Best: <strong id="hud-best">0</strong></span>
+          <span>Alive: <strong id="hud-time">0s</strong></span>
+        </div>
+        <div id="controls">
+          <button id="btn-train">Train</button>
+          <button id="btn-pause" disabled>Pause</button>
+          <button id="btn-reset">Reset Agent</button>
+          <label id="speed-label">
+            Speed
+            <input id="speed-slider" type="range" min="1" max="20" value="1">
+            <span id="speed-val">1x</span>
+          </label>
+          <label id="render-toggle">
+            <input id="render-check" type="checkbox" checked> Render
+          </label>
+        </div>
+      </div>
+
+      <div id="viz-panel">
+        <section class="viz-section">
+          <h2>How Policy Gradient Works</h2>
+          <div id="explanation">
+            <p><strong>REINFORCE</strong> is a policy gradient algorithm. A neural network (the <em>policy</em>) outputs action probabilities given the game state. After each episode:</p>
+            <ol>
+              <li><strong>Collect</strong> trajectory: states, actions, rewards</li>
+              <li><strong>Compute returns</strong> G<sub>t</sub> with discount &gamma;</li>
+              <li><strong>Update</strong> weights: &nabla;&theta; J &asymp; &sum; &nabla; log &pi;(a|s) &middot; G<sub>t</sub></li>
+            </ol>
+            <p>Good actions get reinforced; bad actions get suppressed.</p>
+          </div>
+        </section>
+
+        <section class="viz-section">
+          <h2>Policy Output <span class="dim">(action probabilities)</span></h2>
+          <canvas id="policy-canvas" width="360" height="100"></canvas>
+        </section>
+
+        <section class="viz-section">
+          <h2>Network Architecture</h2>
+          <canvas id="network-canvas" width="360" height="200"></canvas>
+        </section>
+
+        <section class="viz-section">
+          <h2>Training Progress</h2>
+          <canvas id="reward-canvas" width="360" height="160"></canvas>
+        </section>
+
+        <section class="viz-section">
+          <h2>Loss &amp; Gradient Magnitude</h2>
+          <canvas id="loss-canvas" width="360" height="120"></canvas>
+        </section>
+
+        <section class="viz-section">
+          <h2>Current Episode Log</h2>
+          <div id="log-area"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <script src="math.js"></script>
+  <script src="network.js"></script>
+  <script src="agent.js"></script>
+  <script src="game.js"></script>
+  <script src="viz.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,187 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: #0a0e17;
+  color: #c8d0e0;
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 16px 24px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+header h1 {
+  font-size: 1.6rem;
+  color: #e0e8f8;
+  letter-spacing: 0.04em;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  color: #6880a0;
+  margin-top: 2px;
+}
+
+#main-content {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+/* Game panel */
+#game-panel {
+  flex-shrink: 0;
+  width: 480px;
+}
+
+#game-canvas {
+  display: block;
+  background: #0d1220;
+  border: 1px solid #1c2840;
+  border-radius: 6px;
+  width: 480px;
+  height: 480px;
+}
+
+#game-hud {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 4px;
+  font-size: 0.82rem;
+  color: #7090b0;
+}
+
+#game-hud strong {
+  color: #a0c8f0;
+}
+
+#controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  flex-wrap: wrap;
+}
+
+#controls button {
+  padding: 6px 16px;
+  border: 1px solid #2a3a58;
+  border-radius: 4px;
+  background: #141c2e;
+  color: #a0b8d8;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+#controls button:hover:not(:disabled) {
+  background: #1c2a48;
+  border-color: #3a5a88;
+}
+
+#controls button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+#controls button.active {
+  background: #1a3050;
+  border-color: #3080d0;
+  color: #80c0ff;
+}
+
+#speed-label, #render-toggle {
+  font-size: 0.78rem;
+  color: #6880a0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#speed-slider {
+  width: 80px;
+  accent-color: #3080d0;
+}
+
+#speed-val {
+  color: #a0b8d8;
+  min-width: 28px;
+}
+
+/* Viz panel */
+#viz-panel {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.viz-section {
+  background: #0f1525;
+  border: 1px solid #1c2840;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.viz-section h2 {
+  font-size: 0.85rem;
+  color: #8098b8;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.dim {
+  color: #506070;
+  font-weight: 400;
+}
+
+.viz-section canvas {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+}
+
+#explanation {
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #8898b0;
+}
+
+#explanation p { margin-bottom: 6px; }
+#explanation ol { margin-left: 18px; margin-bottom: 6px; }
+#explanation li { margin-bottom: 3px; }
+#explanation strong { color: #a0c0e0; }
+#explanation em { color: #80b0e0; font-style: normal; }
+
+#log-area {
+  font-family: 'Consolas', 'Fira Code', monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  max-height: 120px;
+  overflow-y: auto;
+  color: #607890;
+  padding: 4px;
+}
+
+#log-area .log-good { color: #40a870; }
+#log-area .log-bad  { color: #c06040; }
+#log-area .log-info { color: #6090c0; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1c2840; border-radius: 3px; }
+
+@media (max-width: 960px) {
+  #main-content { flex-direction: column; align-items: center; }
+  #viz-panel { width: 480px; }
+}
