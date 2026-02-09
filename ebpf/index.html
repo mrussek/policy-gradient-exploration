@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>eBPF: A Visual Introduction</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<article>
+
+  <!-- ───────── Hero ───────── -->
+  <header class="hero">
+    <div class="hero-inner">
+      <h1>eBPF</h1>
+      <p class="lead">A visual introduction to the technology redefining Linux networking, observability, and security</p>
+      <div class="hero-tags">
+        <span class="tag">Linux Kernel</span>
+        <span class="tag">Networking</span>
+        <span class="tag">Observability</span>
+        <span class="tag">Security</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ───────── TOC ───────── -->
+  <nav id="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-what">What is eBPF?</a></li>
+      <li><a href="#sec-why">Why eBPF matters</a></li>
+      <li><a href="#sec-arch">Architecture</a></li>
+      <li><a href="#sec-vm">The eBPF Virtual Machine</a></li>
+      <li><a href="#sec-verifier">The Verifier</a></li>
+      <li><a href="#sec-maps">Maps &amp; Data Structures</a></li>
+      <li><a href="#sec-hooks">Hook Points</a></li>
+      <li><a href="#sec-example-trace">Example: Tracing syscalls</a></li>
+      <li><a href="#sec-example-xdp">Example: XDP packet filter</a></li>
+      <li><a href="#sec-example-security">Example: Security enforcement</a></li>
+      <li><a href="#sec-tooling">Tooling Ecosystem</a></li>
+      <li><a href="#sec-lifecycle">Program Lifecycle</a></li>
+      <li><a href="#sec-limits">Limitations &amp; Gotchas</a></li>
+      <li><a href="#sec-future">The Future of eBPF</a></li>
+    </ol>
+  </nav>
+
+  <!-- ───────── What is eBPF ───────── -->
+  <section class="prose" id="sec-what">
+    <h2>What is eBPF?</h2>
+    <p>
+      <strong>eBPF</strong> (extended Berkeley Packet Filter) lets you run sandboxed programs
+      <em>inside the Linux kernel</em> without changing kernel source code or loading kernel modules.
+      Think of it as JavaScript for the kernel&hairsp;&mdash;&hairsp;a safe, portable way to extend
+      what the kernel does at runtime.
+    </p>
+    <div class="viz-container">
+      <canvas id="what-canvas"></canvas>
+    </div>
+    <p>
+      Originally designed for packet filtering (the "BPF" in tcpdump), it evolved into a
+      general-purpose in-kernel virtual machine. Today eBPF powers production systems at
+      Meta, Google, Cloudflare, Netflix, and virtually every major cloud provider.
+    </p>
+    <div class="callout">
+      <strong>Key insight:</strong> Instead of asking the kernel to <em>send data to userspace</em>
+      so you can analyze it, eBPF lets you bring your analysis <em>to where the data already lives</em>&hairsp;&mdash;&hairsp;inside
+      the kernel. This eliminates copying overhead and enables microsecond-level instrumentation.
+    </div>
+  </section>
+
+  <!-- ───────── Why it matters ───────── -->
+  <section class="prose" id="sec-why">
+    <h2>Why eBPF Matters</h2>
+    <p>
+      Traditionally, extending the kernel meant one of three painful options:
+    </p>
+    <div class="three-cols">
+      <div class="col-card col-bad">
+        <h4>Modify kernel source</h4>
+        <p>Submit a patch upstream, wait years for adoption across distros. Not practical for custom logic.</p>
+      </div>
+      <div class="col-card col-bad">
+        <h4>Write a kernel module</h4>
+        <p>Full kernel access but no safety guarantees. A bug crashes the entire machine. Maintenance nightmare across kernel versions.</p>
+      </div>
+      <div class="col-card col-bad">
+        <h4>Stay in userspace</h4>
+        <p>Safe, but every packet/event must cross the kernel-user boundary. High overhead for high-frequency operations.</p>
+      </div>
+    </div>
+    <p>
+      eBPF gives you a fourth option that combines the best of all three:
+    </p>
+    <div class="col-card col-good" style="max-width: 520px; margin: 0 auto 24px;">
+      <h4>eBPF programs</h4>
+      <p>Run inside the kernel with native speed. The verifier guarantees safety&hairsp;&mdash;&hairsp;no crashes, no infinite loops, no unauthorized memory access. Programs are portable across kernel versions via CO-RE (Compile Once &ndash; Run Everywhere).</p>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">
+        <span class="stat-num">&lt;100ns</span>
+        <span class="stat-label">per-packet XDP processing</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">0%</span>
+        <span class="stat-label">crash risk (verifier-checked)</span>
+      </div>
+      <div class="stat">
+        <span class="stat-num">1M+</span>
+        <span class="stat-label">events/sec tracing throughput</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Architecture ───────── -->
+  <section class="prose" id="sec-arch">
+    <h2>Architecture</h2>
+    <p>
+      The eBPF ecosystem has several components that work together. Click on any component
+      to learn more about it:
+    </p>
+    <div class="viz-container">
+      <canvas id="arch-canvas"></canvas>
+      <div id="arch-caption" class="viz-caption">Click a component to learn more.</div>
+    </div>
+    <p>
+      The flow is: you write C (or Rust) code, compile it to eBPF bytecode, the kernel
+      verifier checks it for safety, the JIT compiler turns it into native machine code,
+      and it runs at nearly bare-metal speed whenever its hook point fires.
+    </p>
+  </section>
+
+  <!-- ───────── Virtual Machine ───────── -->
+  <section class="prose" id="sec-vm">
+    <h2>The eBPF Virtual Machine</h2>
+    <p>
+      eBPF programs run on a register-based virtual machine with a deliberately simple instruction set.
+      This simplicity is what makes formal verification possible.
+    </p>
+
+    <div class="spec-grid">
+      <div class="spec-item">
+        <div class="spec-val">11</div>
+        <div class="spec-desc">64-bit registers (r0&ndash;r10)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-val">512 B</div>
+        <div class="spec-desc">Stack size per program</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-val">1M</div>
+        <div class="spec-desc">Max instructions (since 5.2)</div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-val">64-bit</div>
+        <div class="spec-desc">Instruction encoding</div>
+      </div>
+    </div>
+
+    <p>
+      Each instruction is 64 bits wide with a fixed format. Here's what one looks like:
+    </p>
+    <div class="viz-container">
+      <canvas id="instr-canvas"></canvas>
+    </div>
+
+    <p>The instruction set covers the basics you'd expect:</p>
+    <div class="instr-table">
+      <table>
+        <thead>
+          <tr><th>Category</th><th>Examples</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="cat-alu">ALU</td><td><code>add, sub, mul, div, mod, and, or, xor, lsh, rsh</code></td><td>Arithmetic &amp; logic on 32/64-bit registers</td></tr>
+          <tr><td class="cat-mem">Memory</td><td><code>ldx, stx, st</code></td><td>Load/store from stack, maps, packet data</td></tr>
+          <tr><td class="cat-branch">Branch</td><td><code>jeq, jgt, jge, jset, jne, call, exit</code></td><td>Conditional jumps, helper calls, program exit</td></tr>
+          <tr><td class="cat-atomic">Atomic</td><td><code>xadd, cmpxchg, fetch_add</code></td><td>Lock-free concurrent map updates</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>
+      The register <code>r0</code> holds the return value, <code>r1&ndash;r5</code> are
+      function arguments, <code>r6&ndash;r9</code> are callee-saved, and <code>r10</code>
+      is the read-only frame pointer (stack base).
+    </p>
+    <div class="viz-container">
+      <canvas id="registers-canvas"></canvas>
+      <div class="viz-caption">eBPF register file &mdash; hover for details</div>
+    </div>
+  </section>
+
+  <!-- ───────── Verifier ───────── -->
+  <section class="prose" id="sec-verifier">
+    <h2>The Verifier</h2>
+    <p>
+      The verifier is the <em>gatekeeper</em>. Every eBPF program must pass its checks
+      before the kernel will run it. This is what makes eBPF safe to run in kernel space.
+    </p>
+
+    <div class="viz-container">
+      <canvas id="verifier-canvas"></canvas>
+      <div class="controls-row">
+        <button id="verifier-safe-btn">Try Safe Program</button>
+        <button id="verifier-unsafe-btn">Try Unsafe Program</button>
+        <button id="verifier-loop-btn">Try Infinite Loop</button>
+      </div>
+    </div>
+
+    <p>The verifier performs two passes:</p>
+    <ol>
+      <li><strong>DAG check:</strong> Ensures the control flow graph is a directed acyclic graph
+        (no unreachable instructions, no loops that can't be proven to terminate).</li>
+      <li><strong>State simulation:</strong> Walks every possible execution path, tracking register
+        types and value ranges. Every memory access must be proven safe.</li>
+    </ol>
+
+    <p>Here's what the verifier rejects:</p>
+    <div class="reject-grid">
+      <div class="reject-item">
+        <code>Unbounded loops</code>
+        <span>Must have provable upper bound (bounded loops OK since 5.3)</span>
+      </div>
+      <div class="reject-item">
+        <code>Out-of-bounds access</code>
+        <span>Every pointer dereference verified at load time</span>
+      </div>
+      <div class="reject-item">
+        <code>Uninitialized reads</code>
+        <span>All register/stack reads must follow a write</span>
+      </div>
+      <div class="reject-item">
+        <code>Invalid helper calls</code>
+        <span>Only approved helpers for the program type</span>
+      </div>
+      <div class="reject-item">
+        <code>Type violations</code>
+        <span>Can't use a scalar as a pointer or vice versa</span>
+      </div>
+      <div class="reject-item">
+        <code>Stack overflow</code>
+        <span>512-byte stack limit is strictly enforced</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Maps ───────── -->
+  <section class="prose" id="sec-maps">
+    <h2>Maps &amp; Data Structures</h2>
+    <p>
+      eBPF maps are key-value stores that live in kernel memory. They're the primary way
+      eBPF programs share data with each other and with userspace. Maps persist across
+      program invocations&hairsp;&mdash;&hairsp;they're the program's "memory."
+    </p>
+    <div class="viz-container">
+      <canvas id="maps-canvas"></canvas>
+      <div class="controls-row">
+        <button id="maps-put-btn">Put (key, value)</button>
+        <button id="maps-get-btn">Lookup key</button>
+        <button id="maps-del-btn">Delete key</button>
+        <button id="maps-reset-btn">Reset</button>
+        <select id="maps-type-sel">
+          <option value="hash">Hash Map</option>
+          <option value="array">Array</option>
+          <option value="lru">LRU Hash</option>
+          <option value="ringbuf">Ring Buffer</option>
+        </select>
+      </div>
+    </div>
+
+    <p>Common map types:</p>
+    <div class="map-type-grid">
+      <div class="map-card">
+        <h4><code>BPF_MAP_TYPE_HASH</code></h4>
+        <p>General-purpose hash table. Arbitrary keys/values. Most common map type.</p>
+      </div>
+      <div class="map-card">
+        <h4><code>BPF_MAP_TYPE_ARRAY</code></h4>
+        <p>Fixed-size array indexed by integer. O(1) lookup. Pre-allocated, can't delete entries.</p>
+      </div>
+      <div class="map-card">
+        <h4><code>BPF_MAP_TYPE_RINGBUF</code></h4>
+        <p>Lock-free ring buffer for streaming events to userspace. Replaced perf buffers in modern code.</p>
+      </div>
+      <div class="map-card">
+        <h4><code>BPF_MAP_TYPE_LRU_HASH</code></h4>
+        <p>Hash table with LRU eviction. Automatically discards old entries when full. Great for connection tracking.</p>
+      </div>
+      <div class="map-card">
+        <h4><code>BPF_MAP_TYPE_PERCPU_HASH</code></h4>
+        <p>Per-CPU hash table. Each CPU has its own copy&hairsp;&mdash;&hairsp;no locking needed. Ideal for counters.</p>
+      </div>
+      <div class="map-card">
+        <h4><code>BPF_MAP_TYPE_PROG_ARRAY</code></h4>
+        <p>Array of eBPF programs for tail calls. Enables program chaining and dispatch tables.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Hook Points ───────── -->
+  <section class="prose" id="sec-hooks">
+    <h2>Hook Points</h2>
+    <p>
+      eBPF programs attach to <em>hook points</em>&hairsp;&mdash;&hairsp;specific locations in the kernel
+      where your code gets executed. Different program types attach to different hooks:
+    </p>
+    <div class="viz-container">
+      <canvas id="hooks-canvas"></canvas>
+      <div id="hooks-caption" class="viz-caption">Click a hook point to see details.</div>
+    </div>
+
+    <div class="hook-details" id="hook-details" style="display:none;">
+      <h4 id="hook-detail-title"></h4>
+      <p id="hook-detail-desc"></p>
+      <pre id="hook-detail-code"></pre>
+    </div>
+  </section>
+
+  <!-- ───────── Example: tracing ───────── -->
+  <section class="prose" id="sec-example-trace">
+    <h2>Example: Tracing Syscalls</h2>
+    <p>
+      Let's trace every <code>openat()</code> syscall to see which files processes are opening.
+      This is one of the simplest and most useful eBPF programs you can write.
+    </p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">C (eBPF)</span>
+        <span class="code-file">opensnoop.bpf.c</span>
+      </div>
+      <pre><code><span class="kw">#include</span> <span class="str">&lt;vmlinux.h&gt;</span>
+<span class="kw">#include</span> <span class="str">&lt;bpf/bpf_helpers.h&gt;</span>
+
+<span class="comment">// Map: share data between kernel eBPF and userspace</span>
+<span class="kw">struct</span> {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, <span class="num">256</span> * <span class="num">1024</span>);
+} events SEC(<span class="str">".maps"</span>);
+
+<span class="comment">// Event structure sent to userspace</span>
+<span class="kw">struct</span> event {
+    <span class="type">u32</span> pid;
+    <span class="type">u32</span> uid;
+    <span class="type">char</span> comm[<span class="num">16</span>];
+    <span class="type">char</span> filename[<span class="num">256</span>];
+};
+
+<span class="comment">// Attach to the openat() syscall entry</span>
+SEC(<span class="str">"tracepoint/syscalls/sys_enter_openat"</span>)
+<span class="type">int</span> <span class="fn">trace_openat</span>(<span class="kw">struct</span> trace_event_raw_sys_enter *ctx)
+{
+    <span class="kw">struct</span> event *e;
+
+    <span class="comment">// Reserve space in the ring buffer</span>
+    e = bpf_ringbuf_reserve(&events, <span class="kw">sizeof</span>(*e), <span class="num">0</span>);
+    <span class="kw">if</span> (!e) <span class="kw">return</span> <span class="num">0</span>;
+
+    <span class="comment">// Fill in event data</span>
+    e->pid = bpf_get_current_pid_tgid() >> <span class="num">32</span>;
+    e->uid = bpf_get_current_uid_gid() & <span class="num">0xFFFFFFFF</span>;
+    bpf_get_current_comm(&e->comm, <span class="kw">sizeof</span>(e->comm));
+    bpf_probe_read_user_str(&e->filename, <span class="kw">sizeof</span>(e->filename),
+                            (<span class="type">void</span> *)ctx->args[<span class="num">1</span>]);
+
+    <span class="comment">// Submit event to userspace</span>
+    bpf_ringbuf_submit(e, <span class="num">0</span>);
+    <span class="kw">return</span> <span class="num">0</span>;
+}</code></pre>
+    </div>
+
+    <p>
+      The userspace loader opens the ring buffer and reads events:
+    </p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Python</span>
+        <span class="code-file">opensnoop.py</span>
+      </div>
+      <pre><code><span class="kw">from</span> bcc <span class="kw">import</span> BPF
+
+b = BPF(src_file=<span class="str">"opensnoop.bpf.c"</span>)
+
+<span class="comment"># Attach and print events</span>
+<span class="fn">print</span>(<span class="str">f"{'PID':<8} {'COMM':<16} {'FILE'}"</span>)
+
+<span class="kw">def</span> <span class="fn">print_event</span>(cpu, data, size):
+    event = b[<span class="str">"events"</span>].event(data)
+    <span class="fn">print</span>(<span class="str">f"</span>{event.pid:<span class="num">8</span>} {event.comm:<span class="num">16</span>} {event.filename}<span class="str">"</span>)
+
+b[<span class="str">"events"</span>].open_ring_buffer(print_event)
+<span class="kw">while</span> <span class="num">True</span>:
+    b.ring_buffer_consume()</code></pre>
+    </div>
+
+    <p>And the output looks like this:</p>
+    <div class="viz-container terminal-viz">
+      <canvas id="trace-canvas"></canvas>
+    </div>
+
+    <div class="callout">
+      <strong>Why is this better than strace?</strong> strace uses ptrace, which stops the
+      traced process at every syscall&hairsp;&mdash;&hairsp;massive overhead. eBPF runs inside the kernel
+      with no context switches and near-zero overhead. You can trace every process on the
+      system simultaneously without slowing anything down.
+    </div>
+  </section>
+
+  <!-- ───────── Example: XDP ───────── -->
+  <section class="prose" id="sec-example-xdp">
+    <h2>Example: XDP Packet Filter</h2>
+    <p>
+      XDP (eXpress Data Path) lets you process packets <em>before</em> the kernel's networking
+      stack even sees them. This is the fastest programmable packet processing available on
+      Linux&hairsp;&mdash;&hairsp;millions of packets per second on a single core.
+    </p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">C (eBPF)</span>
+        <span class="code-file">xdp_firewall.bpf.c</span>
+      </div>
+      <pre><code><span class="kw">#include</span> <span class="str">&lt;linux/bpf.h&gt;</span>
+<span class="kw">#include</span> <span class="str">&lt;linux/if_ether.h&gt;</span>
+<span class="kw">#include</span> <span class="str">&lt;linux/ip.h&gt;</span>
+<span class="kw">#include</span> <span class="str">&lt;bpf/bpf_helpers.h&gt;</span>
+
+<span class="comment">// Map of blocked IP addresses</span>
+<span class="kw">struct</span> {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __type(key, __u32);          <span class="comment">// IPv4 address</span>
+    __type(value, __u64);        <span class="comment">// drop counter</span>
+    __uint(max_entries, <span class="num">10000</span>);
+} blocklist SEC(<span class="str">".maps"</span>);
+
+<span class="comment">// Packet counters</span>
+<span class="kw">struct</span> {
+    __uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
+    __type(key, __u32);
+    __type(value, __u64);
+    __uint(max_entries, <span class="num">3</span>);  <span class="comment">// 0=pass, 1=drop, 2=total</span>
+} counters SEC(<span class="str">".maps"</span>);
+
+SEC(<span class="str">"xdp"</span>)
+<span class="type">int</span> <span class="fn">xdp_firewall</span>(<span class="kw">struct</span> xdp_md *ctx)
+{
+    <span class="type">void</span> *data     = (<span class="type">void</span> *)(<span class="type">long</span>)ctx->data;
+    <span class="type">void</span> *data_end = (<span class="type">void</span> *)(<span class="type">long</span>)ctx->data_end;
+
+    <span class="comment">// Parse Ethernet header</span>
+    <span class="kw">struct</span> ethhdr *eth = data;
+    <span class="kw">if</span> ((<span class="type">void</span> *)(eth + <span class="num">1</span>) > data_end)
+        <span class="kw">return</span> XDP_PASS;
+
+    <span class="comment">// Only process IPv4</span>
+    <span class="kw">if</span> (eth->h_proto != __constant_htons(ETH_P_IP))
+        <span class="kw">return</span> XDP_PASS;
+
+    <span class="comment">// Parse IP header</span>
+    <span class="kw">struct</span> iphdr *ip = (<span class="type">void</span> *)(eth + <span class="num">1</span>);
+    <span class="kw">if</span> ((<span class="type">void</span> *)(ip + <span class="num">1</span>) > data_end)
+        <span class="kw">return</span> XDP_PASS;
+
+    <span class="comment">// Check source IP against blocklist</span>
+    __u32 src_ip = ip->saddr;
+    __u64 *blocked = bpf_map_lookup_elem(&blocklist, &src_ip);
+
+    __u32 key_total = <span class="num">2</span>;
+    __u64 *total = bpf_map_lookup_elem(&counters, &key_total);
+    <span class="kw">if</span> (total) (*total)++;
+
+    <span class="kw">if</span> (blocked) {
+        <span class="comment">// IP is in blocklist — drop and count</span>
+        (*blocked)++;
+        __u32 key_drop = <span class="num">1</span>;
+        __u64 *drops = bpf_map_lookup_elem(&counters, &key_drop);
+        <span class="kw">if</span> (drops) (*drops)++;
+        <span class="kw">return</span> XDP_DROP;  <span class="comment">// packet never reaches the stack</span>
+    }
+
+    __u32 key_pass = <span class="num">0</span>;
+    __u64 *passes = bpf_map_lookup_elem(&counters, &key_pass);
+    <span class="kw">if</span> (passes) (*passes)++;
+    <span class="kw">return</span> XDP_PASS;
+}</code></pre>
+    </div>
+
+    <p>Watch the packet filter in action:</p>
+    <div class="viz-container">
+      <canvas id="xdp-canvas"></canvas>
+      <div class="controls-row">
+        <button id="xdp-send-btn">Send Packet</button>
+        <button id="xdp-flood-btn">Flood (10 pkt)</button>
+        <button id="xdp-block-btn">Block Random IP</button>
+        <button id="xdp-reset-btn">Reset</button>
+        <span id="xdp-status" class="status-text">Ready</span>
+      </div>
+    </div>
+
+    <p>
+      XDP programs return one of five actions:
+    </p>
+    <div class="action-grid">
+      <div class="action-item action-pass"><code>XDP_PASS</code><span>Normal processing</span></div>
+      <div class="action-item action-drop"><code>XDP_DROP</code><span>Silently drop</span></div>
+      <div class="action-item action-tx"><code>XDP_TX</code><span>Bounce back out same NIC</span></div>
+      <div class="action-item action-redirect"><code>XDP_REDIRECT</code><span>Send to another NIC or CPU</span></div>
+      <div class="action-item action-aborted"><code>XDP_ABORTED</code><span>Drop + trace error</span></div>
+    </div>
+  </section>
+
+  <!-- ───────── Example: Security ───────── -->
+  <section class="prose" id="sec-example-security">
+    <h2>Example: Security Enforcement</h2>
+    <p>
+      LSM (Linux Security Module) BPF programs let you write custom security policies.
+      Here's a program that blocks processes from executing files in <code>/tmp</code>:
+    </p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">C (eBPF)</span>
+        <span class="code-file">no_tmp_exec.bpf.c</span>
+      </div>
+      <pre><code><span class="kw">#include</span> <span class="str">&lt;vmlinux.h&gt;</span>
+<span class="kw">#include</span> <span class="str">&lt;bpf/bpf_helpers.h&gt;</span>
+
+<span class="comment">// Attach to the bprm_check_security LSM hook</span>
+<span class="comment">// This runs before every execve()</span>
+SEC(<span class="str">"lsm/bprm_check_security"</span>)
+<span class="type">int</span> BPF_PROG(<span class="fn">no_tmp_exec</span>, <span class="kw">struct</span> linux_binprm *bprm, <span class="type">int</span> ret)
+{
+    <span class="comment">// If a prior LSM already denied, respect that</span>
+    <span class="kw">if</span> (ret != <span class="num">0</span>)
+        <span class="kw">return</span> ret;
+
+    <span class="type">char</span> path[<span class="num">256</span>];
+    <span class="type">int</span> err;
+
+    <span class="comment">// Read the file path being executed</span>
+    <span class="kw">struct</span> file *file = bprm->file;
+    <span class="kw">struct</span> path *f_path = &file->f_path;
+    err = bpf_d_path(f_path, path, <span class="kw">sizeof</span>(path));
+    <span class="kw">if</span> (err < <span class="num">0</span>)
+        <span class="kw">return</span> <span class="num">0</span>;  <span class="comment">// can't read path, allow</span>
+
+    <span class="comment">// Check if path starts with /tmp/</span>
+    <span class="kw">if</span> (path[<span class="num">0</span>] == <span class="str">'/'</span> && path[<span class="num">1</span>] == <span class="str">'t'</span> &&
+        path[<span class="num">2</span>] == <span class="str">'m'</span> && path[<span class="num">3</span>] == <span class="str">'p'</span> &&
+        path[<span class="num">4</span>] == <span class="str">'/'</span>) {
+        bpf_printk(<span class="str">"BLOCKED exec from /tmp: %s"</span>, path);
+        <span class="kw">return</span> -EPERM;  <span class="comment">// deny execution</span>
+    }
+
+    <span class="kw">return</span> <span class="num">0</span>;  <span class="comment">// allow</span>
+}</code></pre>
+    </div>
+
+    <div class="callout">
+      <strong>Real-world usage:</strong> Projects like <strong>Cilium Tetragon</strong> use
+      LSM BPF to enforce security policies in Kubernetes clusters&hairsp;&mdash;&hairsp;blocking
+      unauthorized process execution, file access, and network connections at the
+      kernel level with sub-microsecond latency.
+    </div>
+  </section>
+
+  <!-- ───────── Tooling ───────── -->
+  <section class="prose" id="sec-tooling">
+    <h2>Tooling Ecosystem</h2>
+    <p>
+      You don't have to write raw eBPF bytecode. A rich ecosystem of tools and frameworks
+      makes eBPF accessible:
+    </p>
+    <div class="viz-container">
+      <canvas id="tooling-canvas"></canvas>
+    </div>
+
+    <div class="tool-grid">
+      <div class="tool-card">
+        <h4>libbpf</h4>
+        <p>The canonical C library. Provides CO-RE support, skeleton generation, and low-level control. Used by most production systems.</p>
+        <span class="tool-tag">C</span>
+      </div>
+      <div class="tool-card">
+        <h4>BCC</h4>
+        <p>BPF Compiler Collection. Python/Lua bindings for rapid prototyping. Compiles C to BPF at runtime. Great for one-off tools.</p>
+        <span class="tool-tag">Python</span>
+      </div>
+      <div class="tool-card">
+        <h4>bpftool</h4>
+        <p>Swiss-army knife CLI for inspecting loaded programs, maps, links, and BTF type info. Essential for debugging.</p>
+        <span class="tool-tag">CLI</span>
+      </div>
+      <div class="tool-card">
+        <h4>Cilium</h4>
+        <p>Kubernetes networking, observability, and security powered by eBPF. Replaces kube-proxy, implements network policies.</p>
+        <span class="tool-tag">K8s</span>
+      </div>
+      <div class="tool-card">
+        <h4>bpftrace</h4>
+        <p>High-level tracing language (like awk for eBPF). One-liners for quick kernel analysis.</p>
+        <span class="tool-tag">Tracing</span>
+      </div>
+      <div class="tool-card">
+        <h4>Aya</h4>
+        <p>Write eBPF programs in pure Rust. No C toolchain needed. Growing ecosystem with strong type safety.</p>
+        <span class="tool-tag">Rust</span>
+      </div>
+    </div>
+
+    <p>A few powerful bpftrace one-liners:</p>
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Shell</span>
+        <span class="code-file">bpftrace examples</span>
+      </div>
+      <pre><code><span class="comment"># Count syscalls by process</span>
+$ bpftrace -e <span class="str">'tracepoint:raw_syscalls:sys_enter { @[comm] = count(); }'</span>
+
+<span class="comment"># Histogram of read() sizes</span>
+$ bpftrace -e <span class="str">'tracepoint:syscalls:sys_exit_read /args->ret > 0/
+    { @bytes = hist(args->ret); }'</span>
+
+<span class="comment"># Trace TCP connections with latency</span>
+$ bpftrace -e <span class="str">'kprobe:tcp_v4_connect { @start[tid] = nsecs; }
+    kretprobe:tcp_v4_connect /@start[tid]/
+    { printf("connect latency: %d us\n",
+             (nsecs - @start[tid]) / 1000);
+      delete(@start[tid]); }'</span>
+
+<span class="comment"># Watch file opens in real time</span>
+$ bpftrace -e <span class="str">'tracepoint:syscalls:sys_enter_openat
+    { printf("%s -> %s\n", comm, str(args->filename)); }'</span></code></pre>
+    </div>
+  </section>
+
+  <!-- ───────── Program Lifecycle ───────── -->
+  <section class="prose" id="sec-lifecycle">
+    <h2>Program Lifecycle</h2>
+    <p>
+      An eBPF program goes through several stages from source code to execution.
+      Click each stage to see what happens:
+    </p>
+    <div class="viz-container">
+      <canvas id="lifecycle-canvas"></canvas>
+      <div id="lifecycle-caption" class="viz-caption">Click a stage to learn more.</div>
+    </div>
+  </section>
+
+  <!-- ───────── Limitations ───────── -->
+  <section class="prose" id="sec-limits">
+    <h2>Limitations &amp; Gotchas</h2>
+    <p>eBPF is powerful, but it's not magic. Understand these constraints before diving in:</p>
+
+    <div class="limits-grid">
+      <div class="limit-card">
+        <h4>Stack Size</h4>
+        <p>512 bytes only. No heap allocation. Large buffers must use maps or per-CPU arrays. This is the most common frustration for beginners.</p>
+      </div>
+      <div class="limit-card">
+        <h4>No Sleeping</h4>
+        <p>eBPF programs can't sleep, block, or wait. No mutexes, no I/O, no sleeping memory allocations. Everything must complete in bounded time.</p>
+      </div>
+      <div class="limit-card">
+        <h4>Verifier Complexity</h4>
+        <p>Large programs can hit verifier limits. The verifier tracks state for every path, so deeply branching code may be rejected as "too complex."</p>
+      </div>
+      <div class="limit-card">
+        <h4>Kernel Version Deps</h4>
+        <p>New features require new kernels. CO-RE helps with portability, but you still can't use features your kernel doesn't have.</p>
+      </div>
+      <div class="limit-card">
+        <h4>Helper Limitations</h4>
+        <p>You can only call approved helper functions. No arbitrary kernel function calls (though kfuncs are relaxing this in newer kernels).</p>
+      </div>
+      <div class="limit-card">
+        <h4>Debugging</h4>
+        <p>No printf-debugging (though bpf_printk exists). No GDB. Verifier error messages can be cryptic. Debugging is the hardest part of eBPF development.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Future ───────── -->
+  <section class="prose" id="sec-future">
+    <h2>The Future of eBPF</h2>
+    <p>eBPF is evolving rapidly. Here's what's on the horizon:</p>
+    <ul class="future-list">
+      <li>
+        <strong>eBPF on Windows:</strong> Microsoft is bringing eBPF to Windows via the
+        ebpf-for-windows project. Cross-platform eBPF is becoming real.
+      </li>
+      <li>
+        <strong>kfuncs:</strong> Kernel functions are being exposed as stable, typed APIs
+        for eBPF programs, gradually replacing the fixed helper set.
+      </li>
+      <li>
+        <strong>BPF Arena:</strong> Shared memory regions between eBPF and userspace,
+        enabling more complex data structures and zero-copy communication.
+      </li>
+      <li>
+        <strong>Scheduling:</strong> sched_ext allows writing CPU schedulers as eBPF
+        programs&hairsp;&mdash;&hairsp;hot-swapping scheduling algorithms at runtime.
+      </li>
+      <li>
+        <strong>HID-BPF:</strong> Programmable human interface devices. Fix buggy USB
+        devices with eBPF instead of kernel patches.
+      </li>
+      <li>
+        <strong>Networking 2.0:</strong> More of the networking stack is becoming
+        programmable&hairsp;&mdash;&hairsp;from socket-level policy to full L4 load balancing.
+      </li>
+    </ul>
+
+    <div class="callout">
+      eBPF is on track to become the standard mechanism for runtime kernel extension.
+      If you work with Linux in any capacity&hairsp;&mdash;&hairsp;infrastructure, networking, security,
+      or performance&hairsp;&mdash;&hairsp;eBPF is worth learning. The kernel is becoming programmable,
+      and eBPF is the programming model.
+    </div>
+  </section>
+
+  <!-- ───────── Further Reading ───────── -->
+  <section class="prose" id="sec-resources">
+    <h2>Further Reading</h2>
+    <ul class="resource-list">
+      <li><strong>ebpf.io</strong> &mdash; Official eBPF project site with docs, talks, and community links</li>
+      <li><strong>"Learning eBPF"</strong> by Liz Rice (O'Reilly) &mdash; Excellent hands-on book</li>
+      <li><strong>"BPF Performance Tools"</strong> by Brendan Gregg &mdash; The comprehensive reference</li>
+      <li><strong>libbpf-bootstrap</strong> &mdash; Template repository for getting started with libbpf + CO-RE</li>
+      <li><strong>Cilium docs</strong> &mdash; Deep technical documentation on eBPF-powered Kubernetes networking</li>
+      <li><strong>kernel.org bpf docs</strong> &mdash; Official kernel documentation for BPF subsystem</li>
+    </ul>
+  </section>
+
+  <footer>
+    <p>An interactive introduction to eBPF &middot; Built with vanilla JavaScript and Canvas</p>
+  </footer>
+
+</article>
+
+<script src="visualizations.js"></script>
+</body>
+</html>
