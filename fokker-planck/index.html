@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Fokker-Planck Equation &mdash; An Interactive Explainer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<article>
+
+  <!-- ───────── Hero ───────── -->
+  <header class="hero">
+    <div class="hero-inner">
+      <h1>The Fokker&ndash;Planck Equation</h1>
+      <p class="lead">How probability distributions evolve in time &mdash; an interactive guide from Brownian motion to stationary states</p>
+    </div>
+  </header>
+
+  <!-- ───────── TOC ───────── -->
+  <nav id="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-intuition">The Core Intuition</a></li>
+      <li><a href="#sec-particles">From Particles to Probability</a></li>
+      <li><a href="#sec-equation">The Equation</a></li>
+      <li><a href="#sec-drift">Drift: The Deterministic Push</a></li>
+      <li><a href="#sec-diffusion">Diffusion: The Random Spread</a></li>
+      <li><a href="#sec-combined">Drift + Diffusion Together</a></li>
+      <li><a href="#sec-potentials">Potential Wells</a></li>
+      <li><a href="#sec-stationary">Stationary Distributions</a></li>
+      <li><a href="#sec-multimodal">Double-Well Potentials</a></li>
+      <li><a href="#sec-sandbox">Full Sandbox</a></li>
+      <li><a href="#sec-applications">Applications</a></li>
+      <li><a href="#sec-math">Mathematical Details</a></li>
+    </ol>
+  </nav>
+
+  <!-- ───────── Intuition ───────── -->
+  <section class="prose" id="sec-intuition">
+    <h2>The Core Intuition</h2>
+    <p>
+      Imagine dropping a blob of ink into gently flowing water. The ink drifts with
+      the current and simultaneously spreads out due to random molecular collisions.
+      The <strong>Fokker&ndash;Planck equation</strong> (FPE) describes exactly how the
+      <em>probability density</em> of such a system evolves over time.
+    </p>
+    <p>
+      Instead of tracking every ink molecule individually, the FPE gives you a single
+      partial differential equation that governs the shape of the entire distribution.
+      It's the bridge between microscopic randomness and macroscopic probability.
+    </p>
+    <div class="callout">
+      <strong>One sentence:</strong> The Fokker&ndash;Planck equation tells you how the
+      probability of finding a particle at position <em>x</em> changes over time, given
+      deterministic forces (drift) and random fluctuations (diffusion).
+    </div>
+  </section>
+
+  <!-- ───────── Particles to Probability ───────── -->
+  <section class="prose" id="sec-particles">
+    <h2>From Particles to Probability</h2>
+    <p>
+      Below, 500 particles start at the same position. Each one follows the <em>same</em>
+      deterministic drift, but each receives <em>independent</em> random noise. Watch how
+      the cloud of particles forms a probability distribution:
+    </p>
+    <div class="viz-container">
+      <canvas id="particles-canvas"></canvas>
+      <div class="controls-row">
+        <button id="particles-restart-btn">Restart</button>
+        <label>
+          Drift &mu;
+          <input id="particles-drift" type="range" min="-30" max="30" value="5">
+          <span id="particles-drift-val">0.50</span>
+        </label>
+        <label>
+          Noise &sigma;
+          <input id="particles-noise" type="range" min="1" max="50" value="20">
+          <span id="particles-noise-val">2.00</span>
+        </label>
+      </div>
+    </div>
+    <p>
+      The histogram at the top shows the particle density. As the number of particles
+      goes to infinity, this histogram converges to the exact solution of the Fokker&ndash;Planck
+      equation. The FPE gives you that smooth limit directly &mdash; no simulation needed.
+    </p>
+  </section>
+
+  <!-- ───────── The Equation ───────── -->
+  <section class="prose" id="sec-equation">
+    <h2>The Equation</h2>
+    <p>The Fokker&ndash;Planck equation in one dimension:</p>
+    <div class="equation-block">
+      <div class="equation-main">
+        <span class="eq-frac"><span class="eq-num">&part;p</span><span class="eq-den">&part;t</span></span>
+        = &minus;
+        <span class="eq-frac"><span class="eq-num">&part;</span><span class="eq-den">&part;x</span></span>
+        <span class="eq-bracket">[</span>
+        &mu;(x) p
+        <span class="eq-bracket">]</span>
+        +
+        <span class="eq-frac"><span class="eq-num">&part;&sup2;</span><span class="eq-den">&part;x&sup2;</span></span>
+        <span class="eq-bracket">[</span>
+        D(x) p
+        <span class="eq-bracket">]</span>
+      </div>
+    </div>
+
+    <p>Where:</p>
+    <div class="var-grid">
+      <div class="var-item">
+        <span class="var-sym">p(x, t)</span>
+        <span class="var-desc">Probability density at position <em>x</em> and time <em>t</em></span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">&mu;(x)</span>
+        <span class="var-desc">Drift coefficient &mdash; the deterministic velocity</span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">D(x)</span>
+        <span class="var-desc">Diffusion coefficient &mdash; the intensity of randomness (&frac12;&sigma;&sup2;)</span>
+      </div>
+    </div>
+
+    <p>
+      The two terms on the right side have distinct physical meanings. Click each
+      to highlight it:
+    </p>
+    <div class="term-cards">
+      <div class="term-card" id="term-drift">
+        <h4>Drift term</h4>
+        <div class="term-eq">&minus; &part;/&part;x [ &mu;(x) p ]</div>
+        <p>Transports probability in the direction of the force. Moves the peak of the distribution.</p>
+      </div>
+      <div class="term-card" id="term-diff">
+        <h4>Diffusion term</h4>
+        <div class="term-eq">&part;&sup2;/&part;x&sup2; [ D(x) p ]</div>
+        <p>Spreads probability outward. Smooths sharp features. Increases entropy.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Drift ───────── -->
+  <section class="prose" id="sec-drift">
+    <h2>Drift: The Deterministic Push</h2>
+    <p>
+      With <strong>drift only</strong> (no diffusion), the probability distribution slides
+      rigidly without changing shape. This is pure advection &mdash; like a conveyor belt
+      carrying the probability density.
+    </p>
+    <div class="viz-container">
+      <canvas id="drift-canvas"></canvas>
+      <div class="controls-row">
+        <button id="drift-play-btn">Play</button>
+        <button id="drift-reset-btn">Reset</button>
+        <label>
+          &mu; = <span id="drift-mu-val">1.0</span>
+          <input id="drift-mu" type="range" min="-30" max="30" value="10">
+        </label>
+      </div>
+    </div>
+    <p>
+      Notice the distribution moves but doesn't spread. Without noise, there's no
+      uncertainty growth &mdash; if you knew the position exactly at <em>t</em>=0,
+      you'd know it exactly at any future time.
+    </p>
+  </section>
+
+  <!-- ───────── Diffusion ───────── -->
+  <section class="prose" id="sec-diffusion">
+    <h2>Diffusion: The Random Spread</h2>
+    <p>
+      With <strong>diffusion only</strong> (no drift), the distribution spreads out
+      symmetrically. This is the heat equation &mdash; sharp features smooth out,
+      and the distribution approaches a uniform spread.
+    </p>
+    <div class="viz-container">
+      <canvas id="diffusion-canvas"></canvas>
+      <div class="controls-row">
+        <button id="diff-play-btn">Play</button>
+        <button id="diff-reset-btn">Reset</button>
+        <label>
+          D = <span id="diff-d-val">1.0</span>
+          <input id="diff-d" type="range" min="1" max="50" value="10">
+        </label>
+      </div>
+    </div>
+    <p>
+      The standard deviation grows as &radic;(2Dt). The peak drops because total probability
+      is conserved &mdash; as the distribution widens, it must flatten to keep the area under
+      the curve equal to 1.
+    </p>
+  </section>
+
+  <!-- ───────── Combined ───────── -->
+  <section class="prose" id="sec-combined">
+    <h2>Drift + Diffusion Together</h2>
+    <p>
+      Now combine both. The distribution simultaneously <em>moves</em> and <em>spreads</em>.
+      This is the general Fokker&ndash;Planck solution: a Gaussian whose center drifts
+      at velocity &mu; while its width grows with &radic;(2Dt).
+    </p>
+    <div class="viz-container">
+      <canvas id="combined-canvas"></canvas>
+      <div class="controls-row">
+        <button id="comb-play-btn">Play</button>
+        <button id="comb-reset-btn">Reset</button>
+        <label>
+          &mu; = <span id="comb-mu-val">1.0</span>
+          <input id="comb-mu" type="range" min="-30" max="30" value="10">
+        </label>
+        <label>
+          D = <span id="comb-d-val">0.5</span>
+          <input id="comb-d" type="range" min="1" max="40" value="5">
+        </label>
+      </div>
+    </div>
+    <div class="callout">
+      <strong>Connection to SDEs:</strong> The Fokker&ndash;Planck equation is the
+      "probability view" of the stochastic differential equation
+      d<em>X</em> = &mu;(<em>X</em>)d<em>t</em> + &sigma;(<em>X</em>)d<em>W</em>.
+      Every SDE has a corresponding FPE, and vice versa. The SDE tracks individual
+      sample paths; the FPE tracks the probability density over all paths at once.
+    </div>
+  </section>
+
+  <!-- ───────── Potential Wells ───────── -->
+  <section class="prose" id="sec-potentials">
+    <h2>Potential Wells</h2>
+    <p>
+      When drift comes from a potential V(x) via &mu;(x) = &minus;V'(x), particles are
+      pushed toward energy minima. The competition between the confining force (drift
+      toward the minimum) and diffusion (spreading outward) leads to a <em>stationary
+      distribution</em> &mdash; an equilibrium where drift and diffusion exactly balance.
+    </p>
+    <p>
+      The visualization below shows a harmonic potential V(x) = &frac12;kx&sup2;.
+      Watch the distribution start from a delta-like spike and relax toward the
+      Boltzmann equilibrium:
+    </p>
+    <div class="viz-container">
+      <canvas id="potential-canvas"></canvas>
+      <div class="controls-row">
+        <button id="pot-play-btn">Play</button>
+        <button id="pot-reset-btn">Reset</button>
+        <label>
+          Stiffness k = <span id="pot-k-val">2.0</span>
+          <input id="pot-k" type="range" min="1" max="50" value="20">
+        </label>
+        <label>
+          Diffusion D = <span id="pot-d-val">1.0</span>
+          <input id="pot-d" type="range" min="1" max="40" value="10">
+        </label>
+      </div>
+    </div>
+    <p>
+      For a harmonic potential, the stationary distribution is Gaussian with variance
+      &sigma;&sup2; = D/k. Higher stiffness &rarr; narrower distribution. Higher diffusion
+      &rarr; wider distribution.
+    </p>
+  </section>
+
+  <!-- ───────── Stationary ───────── -->
+  <section class="prose" id="sec-stationary">
+    <h2>Stationary Distributions</h2>
+    <p>
+      A <strong>stationary distribution</strong> p<sub>ss</sub>(x) satisfies &part;p/&part;t = 0.
+      For a system with potential V(x) and constant diffusion D, the solution is the
+      <strong>Boltzmann distribution</strong>:
+    </p>
+    <div class="equation-block">
+      <div class="equation-main">
+        p<sub>ss</sub>(x) &prop; exp
+        <span class="eq-bracket">(</span>
+        &minus; V(x) / D
+        <span class="eq-bracket">)</span>
+      </div>
+    </div>
+    <p>
+      The ratio V(x)/D acts like inverse temperature. High diffusion (high "temperature")
+      flattens the distribution; low diffusion concentrates it at the potential minimum.
+      Adjust the temperature below to see this in action:
+    </p>
+    <div class="viz-container">
+      <canvas id="boltzmann-canvas"></canvas>
+      <div class="controls-row">
+        <label>
+          Temperature D = <span id="boltz-d-val">1.0</span>
+          <input id="boltz-d" type="range" min="1" max="60" value="10">
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Double Well ───────── -->
+  <section class="prose" id="sec-multimodal">
+    <h2>Double-Well Potentials</h2>
+    <p>
+      Things get much more interesting with a double-well potential V(x) = (x&sup2; &minus; a&sup2;)&sup2;.
+      Now there are two stable equilibria. At low temperature, the distribution concentrates
+      around both minima. At high temperature, diffusion overwhelms the barrier and
+      the distribution merges into a single broad peak.
+    </p>
+    <div class="viz-container">
+      <canvas id="double-canvas"></canvas>
+      <div class="controls-row">
+        <button id="dbl-play-btn">Play</button>
+        <button id="dbl-reset-btn">Reset</button>
+        <label>
+          Barrier a = <span id="dbl-a-val">1.5</span>
+          <input id="dbl-a" type="range" min="5" max="25" value="15">
+        </label>
+        <label>
+          D = <span id="dbl-d-val">0.5</span>
+          <input id="dbl-d" type="range" min="1" max="40" value="5">
+        </label>
+        <label>
+          Start:
+          <select id="dbl-start">
+            <option value="left">Left well</option>
+            <option value="center">Center</option>
+            <option value="right">Right well</option>
+          </select>
+        </label>
+      </div>
+    </div>
+    <p>
+      This is a model of <em>phase transitions</em>, <em>chemical reactions</em>,
+      and <em>bistable switches</em>. The rate of hopping between wells depends
+      exponentially on the barrier height divided by D &mdash; this is the
+      <strong>Kramers escape rate</strong>.
+    </p>
+  </section>
+
+  <!-- ───────── Sandbox ───────── -->
+  <section class="prose" id="sec-sandbox">
+    <h2>Full Sandbox</h2>
+    <p>
+      Choose a potential, set drift and diffusion parameters, pick an initial distribution,
+      and watch the Fokker&ndash;Planck equation evolve. The solver uses a finite-difference
+      scheme updated every frame.
+    </p>
+    <div class="viz-container">
+      <canvas id="sandbox-canvas"></canvas>
+      <div class="controls-row">
+        <button id="sb-play-btn">Play</button>
+        <button id="sb-step-btn">Step</button>
+        <button id="sb-reset-btn">Reset</button>
+        <select id="sb-potential">
+          <option value="none">No potential (free)</option>
+          <option value="harmonic" selected>Harmonic V=kx&sup2;/2</option>
+          <option value="double">Double well V=(x&sup2;-a&sup2;)&sup2;</option>
+          <option value="asymmetric">Asymmetric double well</option>
+          <option value="periodic">Periodic V=cos(x)</option>
+        </select>
+      </div>
+      <div class="controls-row">
+        <label>
+          D = <span id="sb-d-val">1.0</span>
+          <input id="sb-d" type="range" min="1" max="60" value="10">
+        </label>
+        <label>
+          k = <span id="sb-k-val">1.0</span>
+          <input id="sb-k" type="range" min="1" max="40" value="10">
+        </label>
+        <label>
+          Init:
+          <select id="sb-init">
+            <option value="delta">Delta (narrow)</option>
+            <option value="uniform">Uniform</option>
+            <option value="bimodal">Bimodal</option>
+            <option value="left">Left side</option>
+          </select>
+        </label>
+      </div>
+      <div id="sb-info" class="viz-info"></div>
+    </div>
+  </section>
+
+  <!-- ───────── Applications ───────── -->
+  <section class="prose" id="sec-applications">
+    <h2>Applications</h2>
+    <p>The Fokker&ndash;Planck equation appears across science and engineering:</p>
+    <div class="app-grid">
+      <div class="app-card">
+        <h4>Statistical Physics</h4>
+        <p>Brownian motion, polymer dynamics, colloidal suspensions, thermal fluctuations in nanoscale systems.</p>
+      </div>
+      <div class="app-card">
+        <h4>Finance</h4>
+        <p>The Black&ndash;Scholes equation is a Fokker&ndash;Planck equation for option price distributions under geometric Brownian motion.</p>
+      </div>
+      <div class="app-card">
+        <h4>Neuroscience</h4>
+        <p>Distribution of membrane potentials in neural populations. Mean-field models of spiking networks.</p>
+      </div>
+      <div class="app-card">
+        <h4>Machine Learning</h4>
+        <p>Score-based diffusion models (DDPM, score matching) are directly based on the FPE. The forward/reverse SDE framework uses it to generate images from noise.</p>
+      </div>
+      <div class="app-card">
+        <h4>Chemical Kinetics</h4>
+        <p>Reaction coordinate dynamics, transition state theory, protein folding landscapes.</p>
+      </div>
+      <div class="app-card">
+        <h4>Plasma Physics</h4>
+        <p>Coulomb collision operators in fusion plasmas. Velocity distribution of charged particles in electromagnetic fields.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Math Details ───────── -->
+  <section class="prose" id="sec-math">
+    <h2>Mathematical Details</h2>
+
+    <h3>Connection to the Langevin / SDE</h3>
+    <p>Given the It&ocirc; stochastic differential equation:</p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">d<em>X</em><sub>t</sub> = &mu;(<em>X</em><sub>t</sub>) d<em>t</em> + &sigma;(<em>X</em><sub>t</sub>) d<em>W</em><sub>t</sub></div>
+    </div>
+    <p>the corresponding Fokker&ndash;Planck equation for p(x,t) is:</p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">
+        &part;p/&part;t = &minus;&part;<sub>x</sub>[&mu;(x)p] + &frac12; &part;<sub>x</sub>&sup2;[&sigma;(x)&sup2; p]
+      </div>
+    </div>
+    <p>with D(x) = &frac12;&sigma;(x)&sup2;.</p>
+
+    <h3>Conservation of Probability</h3>
+    <p>
+      The FPE is a <em>continuity equation</em>: &part;p/&part;t + &part;J/&part;x = 0,
+      where the probability current is:
+    </p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">
+        J(x,t) = &mu;(x) p &minus; &part;<sub>x</sub>[D(x) p]
+      </div>
+    </div>
+    <p>
+      Total probability &int; p(x,t) dx = 1 is preserved for all time, provided
+      J vanishes at the boundaries.
+    </p>
+
+    <h3>Detailed Balance &amp; Equilibrium</h3>
+    <p>
+      In equilibrium, J = 0 everywhere. For a system with potential V(x) and constant D:
+    </p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">
+        &mu;(x) p<sub>ss</sub> = D &part;<sub>x</sub> p<sub>ss</sub>
+        &nbsp;&rArr;&nbsp;
+        p<sub>ss</sub>(x) = Z<sup>&minus;1</sup> exp(&minus;V(x)/D)
+      </div>
+    </div>
+    <p>where Z is the normalization constant (partition function).</p>
+
+    <h3>Eigenfunction Expansion</h3>
+    <p>
+      For a confining potential, the FPE operator has a discrete spectrum of eigenvalues
+      0 = &lambda;<sub>0</sub> &lt; &lambda;<sub>1</sub> &lt; &lambda;<sub>2</sub> &lt; &hellip;
+      The eigenfunction for &lambda;<sub>0</sub> is the stationary distribution. The gap
+      &lambda;<sub>1</sub> sets the relaxation timescale: &tau; ~ 1/&lambda;<sub>1</sub>.
+    </p>
+
+    <h3>Numerical Method Used Here</h3>
+    <p>
+      The visualizations use the <strong>Crank&ndash;Nicolson</strong> finite-difference scheme
+      (implicit in diffusion, explicit in drift) on a uniform spatial grid. This is
+      unconditionally stable and conserves total probability to machine precision.
+      Reflecting (zero-flux) boundary conditions are enforced at the domain edges.
+    </p>
+  </section>
+
+  <footer>
+    <p>An interactive guide to the Fokker&ndash;Planck equation &middot; Built with vanilla JavaScript and Canvas</p>
+  </footer>
+
+</article>
+
+<script src="solver.js"></script>
+<script src="visualizations.js"></script>
+</body>
+</html>
