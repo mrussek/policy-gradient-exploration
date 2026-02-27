@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Black-Scholes &mdash; From Fokker-Planck to Option Pricing</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="progress-bar"></div>
+
+<article>
+
+  <!-- ───────── Hero ───────── -->
+  <header class="hero">
+    <div class="hero-inner">
+      <h1>Black&ndash;Scholes</h1>
+      <p class="lead">From Brownian motion and Fokker&ndash;Planck to the equation that changed finance</p>
+      <div class="hero-link">Builds on: <a href="../fokker-planck/">The Fokker&ndash;Planck Equation</a></div>
+    </div>
+  </header>
+
+  <!-- ───────── TOC ───────── -->
+  <nav id="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#sec-bridge">The Fokker&ndash;Planck Bridge</a></li>
+      <li><a href="#sec-gbm">Geometric Brownian Motion</a></li>
+      <li><a href="#sec-lognormal">The Log-Normal Distribution</a></li>
+      <li><a href="#sec-options">What Are Options?</a></li>
+      <li><a href="#sec-derivation">Deriving Black&ndash;Scholes</a></li>
+      <li><a href="#sec-formula">The Formula</a></li>
+      <li><a href="#sec-calculator">Option Price Calculator</a></li>
+      <li><a href="#sec-greeks">The Greeks</a></li>
+      <li><a href="#sec-surface">Volatility &amp; Price Surfaces</a></li>
+      <li><a href="#sec-hedging">Dynamic Hedging</a></li>
+      <li><a href="#sec-montecarlo">Monte Carlo Verification</a></li>
+      <li><a href="#sec-limits">Limitations &amp; Reality</a></li>
+    </ol>
+  </nav>
+
+  <!-- ───────── FP Bridge ───────── -->
+  <section class="prose" id="sec-bridge">
+    <h2>The Fokker&ndash;Planck Bridge</h2>
+    <p>
+      In the <a href="../fokker-planck/">Fokker&ndash;Planck explainer</a>, we saw how a
+      probability density p(x,t) evolves under drift &mu; and diffusion D:
+    </p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">&part;p/&part;t = &minus;&part;<sub>x</sub>[&mu; p] + D &part;<sub>x</sub>&sup2;[p]</div>
+    </div>
+    <p>
+      The <strong>Black&ndash;Scholes equation</strong> is exactly this, but viewed
+      <em>backwards in time</em> and applied to <em>stock prices</em>. Where Fokker&ndash;Planck
+      asks "given an initial distribution, where will it go?", Black&ndash;Scholes asks
+      "given a final payoff at expiry, what is it worth today?"
+    </p>
+
+    <div class="dual-box">
+      <div class="dual-card">
+        <h4>Fokker&ndash;Planck (Forward)</h4>
+        <p class="dual-eq">&part;p/&part;t = &minus;&part;<sub>x</sub>[&mu;p] + &frac12;&sigma;&sup2; &part;<sub>x</sub>&sup2;[p]</p>
+        <p>Evolves probability <em>forward</em> in time. Given where you start, where will you be?</p>
+      </div>
+      <div class="dual-card">
+        <h4>Black&ndash;Scholes (Backward)</h4>
+        <p class="dual-eq">&part;V/&part;t + rS &part;<sub>S</sub>V + &frac12;&sigma;&sup2;S&sup2; &part;<sub>S</sub>&sup2;V = rV</p>
+        <p>Evolves option value <em>backward</em> from expiry. Given the payoff at T, what is it worth now?</p>
+      </div>
+    </div>
+
+    <div class="callout">
+      <strong>Key insight:</strong> The Black&ndash;Scholes PDE is the
+      <em>adjoint</em> (time-reversed partner) of the Fokker&ndash;Planck equation
+      for stock prices. The same diffusion process underlies both &mdash; one propagates
+      probability forward, the other propagates value backward.
+    </div>
+  </section>
+
+  <!-- ───────── GBM ───────── -->
+  <section class="prose" id="sec-gbm">
+    <h2>Geometric Brownian Motion</h2>
+    <p>
+      Black&ndash;Scholes assumes stock prices follow <strong>geometric Brownian motion</strong> (GBM):
+    </p>
+    <div class="equation-block">
+      <div class="equation-main">dS = &mu;S dt + &sigma;S dW</div>
+    </div>
+    <p>
+      This is the SDE whose Fokker&ndash;Planck equation governs the probability density
+      of the stock price. The key feature: both drift and diffusion are <em>proportional
+      to S</em>, so the stock price can never go negative and percentage returns are normally
+      distributed.
+    </p>
+    <p>Watch sample paths of GBM below. Each path is one possible future for the stock price:</p>
+    <div class="viz-container">
+      <canvas id="gbm-canvas"></canvas>
+      <div class="controls-row">
+        <button id="gbm-regen-btn">Regenerate</button>
+        <label>
+          Drift &mu; = <span id="gbm-mu-val">0.08</span>
+          <input id="gbm-mu" type="range" min="-20" max="40" value="8">
+        </label>
+        <label>
+          Volatility &sigma; = <span id="gbm-sigma-val">0.20</span>
+          <input id="gbm-sigma" type="range" min="2" max="60" value="20">
+        </label>
+        <label>
+          Paths
+          <input id="gbm-npaths" type="range" min="5" max="200" value="50">
+          <span id="gbm-npaths-val">50</span>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Lognormal ───────── -->
+  <section class="prose" id="sec-lognormal">
+    <h2>The Log-Normal Distribution</h2>
+    <p>
+      Solving the Fokker&ndash;Planck equation for GBM gives us the probability density
+      of the stock price at time T. Since log(S) is normally distributed, S itself follows
+      a <strong>log-normal distribution</strong>:
+    </p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">
+        log(S<sub>T</sub>) ~ N(log(S<sub>0</sub>) + (&mu; &minus; &frac12;&sigma;&sup2;)T, &ensp;&sigma;&sup2;T)
+      </div>
+    </div>
+    <p>Watch how the distribution of terminal stock prices evolves with time and volatility:</p>
+    <div class="viz-container">
+      <canvas id="lognormal-canvas"></canvas>
+      <div class="controls-row">
+        <label>
+          T = <span id="ln-t-val">1.0</span> yr
+          <input id="ln-t" type="range" min="1" max="40" value="10">
+        </label>
+        <label>
+          &sigma; = <span id="ln-sig-val">0.20</span>
+          <input id="ln-sig" type="range" min="2" max="60" value="20">
+        </label>
+        <label>
+          &mu; = <span id="ln-mu-val">0.08</span>
+          <input id="ln-mu" type="range" min="-10" max="30" value="8">
+        </label>
+      </div>
+    </div>
+    <p>
+      Notice the <em>right skew</em>: the log-normal distribution has a long right tail
+      (big gains are possible) but is bounded at zero (you can't lose more than 100%).
+      As volatility increases, the distribution spreads and skews further right.
+    </p>
+  </section>
+
+  <!-- ───────── Options ───────── -->
+  <section class="prose" id="sec-options">
+    <h2>What Are Options?</h2>
+    <p>
+      An <strong>option</strong> is a contract that gives you the <em>right</em>
+      (but not the obligation) to buy or sell a stock at a fixed <em>strike price</em>
+      K on or before an <em>expiry date</em> T.
+    </p>
+    <div class="dual-box">
+      <div class="dual-card call-card">
+        <h4>Call Option</h4>
+        <p>Right to <strong>buy</strong> at price K</p>
+        <p class="dual-eq">Payoff = max(S<sub>T</sub> &minus; K, 0)</p>
+        <p>Profitable when S<sub>T</sub> &gt; K (stock goes up)</p>
+      </div>
+      <div class="dual-card put-card">
+        <h4>Put Option</h4>
+        <p>Right to <strong>sell</strong> at price K</p>
+        <p class="dual-eq">Payoff = max(K &minus; S<sub>T</sub>, 0)</p>
+        <p>Profitable when S<sub>T</sub> &lt; K (stock goes down)</p>
+      </div>
+    </div>
+    <p>The question Black&ndash;Scholes answers: <strong>what is a fair price for this contract today?</strong></p>
+    <div class="viz-container">
+      <canvas id="payoff-canvas"></canvas>
+      <div class="controls-row">
+        <label>
+          Strike K = <span id="payoff-k-val">100</span>
+          <input id="payoff-k" type="range" min="50" max="150" value="100">
+        </label>
+        <button id="payoff-call-btn" class="active">Call</button>
+        <button id="payoff-put-btn">Put</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Derivation ───────── -->
+  <section class="prose" id="sec-derivation">
+    <h2>Deriving Black&ndash;Scholes</h2>
+    <p>The derivation follows three key steps. Click each to expand:</p>
+
+    <div class="deriv-steps">
+      <details class="deriv-step">
+        <summary>
+          <span class="step-num">1</span>
+          <span>Construct a risk-free portfolio</span>
+        </summary>
+        <div class="step-body">
+          <p>
+            Create a portfolio &Pi; = V &minus; &Delta;S where V is the option value and &Delta; = &part;V/&part;S
+            is the number of shares held. Over a small time interval:
+          </p>
+          <div class="equation-block small-eq">
+            <div class="equation-main">d&Pi; = dV &minus; &Delta; dS</div>
+          </div>
+          <p>
+            By choosing &Delta; = &part;V/&part;S exactly, we cancel out the random dW term.
+            The portfolio becomes <em>instantaneously risk-free</em>.
+          </p>
+        </div>
+      </details>
+
+      <details class="deriv-step">
+        <summary>
+          <span class="step-num">2</span>
+          <span>Apply It&ocirc;'s lemma to the option value</span>
+        </summary>
+        <div class="step-body">
+          <p>Since V(S,t) is a function of the stochastic variable S, It&ocirc;'s lemma gives:</p>
+          <div class="equation-block small-eq">
+            <div class="equation-main">
+              dV = &part;V/&part;t dt + &part;V/&part;S dS + &frac12;&sigma;&sup2;S&sup2; &part;&sup2;V/&part;S&sup2; dt
+            </div>
+          </div>
+          <p>
+            The &frac12;&sigma;&sup2;S&sup2; &part;&sup2;V/&part;S&sup2; term is the "It&ocirc; correction" &mdash;
+            it arises because (dW)&sup2; = dt in stochastic calculus. This is the same
+            diffusion term that appears in Fokker&ndash;Planck.
+          </p>
+        </div>
+      </details>
+
+      <details class="deriv-step">
+        <summary>
+          <span class="step-num">3</span>
+          <span>Set portfolio return equal to risk-free rate</span>
+        </summary>
+        <div class="step-body">
+          <p>
+            Since the hedged portfolio is risk-free, no-arbitrage requires it earn the risk-free rate r:
+          </p>
+          <div class="equation-block small-eq">
+            <div class="equation-main">d&Pi; = r &Pi; dt</div>
+          </div>
+          <p>Substituting and simplifying yields the Black&ndash;Scholes PDE:</p>
+          <div class="equation-block">
+            <div class="equation-main">
+              &part;V/&part;t + rS &part;V/&part;S + &frac12;&sigma;&sup2;S&sup2; &part;&sup2;V/&part;S&sup2; = rV
+            </div>
+          </div>
+          <p>
+            Notice: the drift &mu; has vanished! The option price doesn't depend on the
+            expected return of the stock &mdash; only on its volatility. This is the
+            <em>risk-neutral pricing</em> insight.
+          </p>
+        </div>
+      </details>
+    </div>
+
+    <div class="callout">
+      <strong>Connection to Fokker&ndash;Planck:</strong> Under the risk-neutral measure,
+      the stock follows dS = rS dt + &sigma;S dW. The Fokker&ndash;Planck equation for
+      this process propagates the risk-neutral probability density forward. The Black&ndash;Scholes
+      PDE propagates the option value <em>backward</em> from the terminal payoff.
+      They are adjoint operators &mdash; two sides of the same coin.
+    </div>
+  </section>
+
+  <!-- ───────── The Formula ───────── -->
+  <section class="prose" id="sec-formula">
+    <h2>The Formula</h2>
+    <p>Solving the PDE with the boundary condition V(S,T) = max(S&minus;K, 0) for a call gives:</p>
+    <div class="equation-block">
+      <div class="equation-main">C = S<sub>0</sub> N(d<sub>1</sub>) &minus; K e<sup>&minus;rT</sup> N(d<sub>2</sub>)</div>
+    </div>
+    <p>And for a put:</p>
+    <div class="equation-block">
+      <div class="equation-main">P = K e<sup>&minus;rT</sup> N(&minus;d<sub>2</sub>) &minus; S<sub>0</sub> N(&minus;d<sub>1</sub>)</div>
+    </div>
+    <p>Where:</p>
+    <div class="equation-block small-eq">
+      <div class="equation-main">
+        d<sub>1</sub> = [log(S<sub>0</sub>/K) + (r + &sigma;&sup2;/2)T] / (&sigma;&radic;T)
+        <br><br>
+        d<sub>2</sub> = d<sub>1</sub> &minus; &sigma;&radic;T
+      </div>
+    </div>
+
+    <div class="var-grid">
+      <div class="var-item">
+        <span class="var-sym">S<sub>0</sub></span>
+        <span class="var-desc">Current stock price</span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">K</span>
+        <span class="var-desc">Strike price</span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">T</span>
+        <span class="var-desc">Time to expiration (years)</span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">r</span>
+        <span class="var-desc">Risk-free interest rate (annual)</span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">&sigma;</span>
+        <span class="var-desc">Volatility (annualized standard deviation of log returns)</span>
+      </div>
+      <div class="var-item">
+        <span class="var-sym">N(x)</span>
+        <span class="var-desc">Cumulative standard normal distribution function</span>
+      </div>
+    </div>
+
+    <p>
+      The term S<sub>0</sub>N(d<sub>1</sub>) represents the expected stock value
+      you receive (weighted by exercise probability), and Ke<sup>&minus;rT</sup>N(d<sub>2</sub>)
+      is the present value of the strike you pay (weighted by exercise probability).
+      N(d<sub>2</sub>) is the risk-neutral probability the option finishes in-the-money.
+    </p>
+  </section>
+
+  <!-- ───────── Calculator ───────── -->
+  <section class="prose" id="sec-calculator">
+    <h2>Option Price Calculator</h2>
+    <p>Adjust the five parameters and see the call and put prices, plus how the probability distribution relates to the payoff:</p>
+    <div class="viz-container">
+      <canvas id="calc-canvas"></canvas>
+      <div class="calc-results" id="calc-results"></div>
+      <div class="controls-row">
+        <label>S<sub>0</sub> = <span id="calc-s-val">100</span>
+          <input id="calc-s" type="range" min="50" max="200" value="100">
+        </label>
+        <label>K = <span id="calc-k-val">100</span>
+          <input id="calc-k" type="range" min="50" max="200" value="100">
+        </label>
+        <label>T = <span id="calc-t-val">1.0</span>yr
+          <input id="calc-t" type="range" min="1" max="30" value="10">
+        </label>
+      </div>
+      <div class="controls-row">
+        <label>&sigma; = <span id="calc-sig-val">0.20</span>
+          <input id="calc-sig" type="range" min="2" max="80" value="20">
+        </label>
+        <label>r = <span id="calc-r-val">0.05</span>
+          <input id="calc-r" type="range" min="0" max="20" value="5">
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Greeks ───────── -->
+  <section class="prose" id="sec-greeks">
+    <h2>The Greeks</h2>
+    <p>
+      The "Greeks" measure how the option price changes with respect to each input.
+      They are the partial derivatives of the Black&ndash;Scholes formula &mdash; essential
+      for hedging and risk management.
+    </p>
+    <div class="viz-container">
+      <canvas id="greeks-canvas"></canvas>
+      <div class="controls-row">
+        <button class="greek-btn active" data-greek="delta">Delta &Delta;</button>
+        <button class="greek-btn" data-greek="gamma">Gamma &Gamma;</button>
+        <button class="greek-btn" data-greek="theta">Theta &Theta;</button>
+        <button class="greek-btn" data-greek="vega">Vega &nu;</button>
+        <button class="greek-btn" data-greek="rho">Rho &rho;</button>
+      </div>
+      <div id="greek-desc" class="viz-desc"></div>
+    </div>
+    <div class="greek-grid">
+      <div class="greek-card">
+        <h4>Delta (&Delta;)</h4>
+        <p class="greek-eq">&part;V/&part;S = N(d<sub>1</sub>)</p>
+        <p>Sensitivity to stock price. Also: probability the option expires in-the-money (approximately). Ranges from 0 to 1 for calls.</p>
+      </div>
+      <div class="greek-card">
+        <h4>Gamma (&Gamma;)</h4>
+        <p class="greek-eq">&part;&sup2;V/&part;S&sup2; = N'(d<sub>1</sub>)/S&sigma;&radic;T</p>
+        <p>Rate of change of Delta. Peaks when S &asymp; K (at-the-money). Highest near expiry.</p>
+      </div>
+      <div class="greek-card">
+        <h4>Theta (&Theta;)</h4>
+        <p class="greek-eq">&part;V/&part;t</p>
+        <p>Time decay: options lose value as expiry approaches. Almost always negative. Accelerates near expiry.</p>
+      </div>
+      <div class="greek-card">
+        <h4>Vega (&nu;)</h4>
+        <p class="greek-eq">&part;V/&part;&sigma; = S N'(d<sub>1</sub>) &radic;T</p>
+        <p>Sensitivity to volatility. Always positive: more uncertainty = more option value. Peaks at-the-money.</p>
+      </div>
+      <div class="greek-card">
+        <h4>Rho (&rho;)</h4>
+        <p class="greek-eq">&part;V/&part;r = KT e<sup>&minus;rT</sup> N(d<sub>2</sub>)</p>
+        <p>Sensitivity to interest rates. Typically small for short-dated options.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Surface ───────── -->
+  <section class="prose" id="sec-surface">
+    <h2>Volatility &amp; Price Surfaces</h2>
+    <p>
+      Option prices vary across strike and time to expiry, forming a <em>surface</em>.
+      The heatmap below shows call option price as a function of stock price and time
+      to expiry. Drag the crosshair to explore:
+    </p>
+    <div class="viz-container">
+      <canvas id="surface-canvas"></canvas>
+      <div id="surface-info" class="viz-desc"></div>
+      <div class="controls-row">
+        <label>K = <span id="surf-k-val">100</span>
+          <input id="surf-k" type="range" min="60" max="140" value="100">
+        </label>
+        <label>&sigma; = <span id="surf-sig-val">0.20</span>
+          <input id="surf-sig" type="range" min="5" max="60" value="20">
+        </label>
+        <label>r = <span id="surf-r-val">0.05</span>
+          <input id="surf-r" type="range" min="0" max="15" value="5">
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ───────── Hedging ───────── -->
+  <section class="prose" id="sec-hedging">
+    <h2>Dynamic Hedging</h2>
+    <p>
+      The Black&ndash;Scholes derivation assumes you can <em>continuously</em> rebalance
+      a portfolio of stock and cash to replicate the option payoff. This is <strong>delta hedging</strong>:
+      hold &Delta; = &part;V/&part;S shares at all times.
+    </p>
+    <p>
+      The simulation below shows delta hedging in action. A market maker sells a call option
+      and hedges by dynamically adjusting their stock position. The green line shows the
+      hedge portfolio value tracking the option value:
+    </p>
+    <div class="viz-container">
+      <canvas id="hedge-canvas"></canvas>
+      <div class="controls-row">
+        <button id="hedge-run-btn">Run Simulation</button>
+        <button id="hedge-reset-btn">Reset</button>
+        <label>&sigma; = <span id="hedge-sig-val">0.20</span>
+          <input id="hedge-sig" type="range" min="5" max="50" value="20">
+        </label>
+        <label>Rebalance:
+          <select id="hedge-freq">
+            <option value="1">Daily</option>
+            <option value="5">Weekly</option>
+            <option value="20">Monthly</option>
+          </select>
+        </label>
+      </div>
+      <div id="hedge-info" class="viz-desc"></div>
+    </div>
+    <p>
+      Rebalancing more frequently reduces hedging error. In the limit of continuous
+      rebalancing, the hedge is perfect &mdash; this is the idealization Black&ndash;Scholes
+      assumes. In practice, transaction costs make continuous rebalancing impossible.
+    </p>
+  </section>
+
+  <!-- ───────── Monte Carlo ───────── -->
+  <section class="prose" id="sec-montecarlo">
+    <h2>Monte Carlo Verification</h2>
+    <p>
+      We can verify the Black&ndash;Scholes formula by simulation. Generate thousands
+      of GBM paths, compute the payoff at expiry for each, and average the discounted
+      payoffs. As the number of paths grows, the Monte Carlo estimate converges to the
+      analytical Black&ndash;Scholes price:
+    </p>
+    <div class="viz-container">
+      <canvas id="mc-canvas"></canvas>
+      <div class="controls-row">
+        <button id="mc-run-btn">Run (1000 paths)</button>
+        <button id="mc-run10k-btn">Run (10000 paths)</button>
+        <button id="mc-reset-btn">Reset</button>
+        <span id="mc-status" class="status-text"></span>
+      </div>
+    </div>
+    <p>
+      This is the Fokker&ndash;Planck perspective: instead of solving the PDE, simulate
+      the <em>underlying stochastic process</em> and compute expectations. The two approaches
+      give the same answer &mdash; one is the PDE, the other is the SDE.
+    </p>
+  </section>
+
+  <!-- ───────── Limitations ───────── -->
+  <section class="prose" id="sec-limits">
+    <h2>Limitations &amp; Reality</h2>
+    <p>
+      The Black&ndash;Scholes model makes idealized assumptions. Real markets violate all of them:
+    </p>
+    <div class="limits-grid">
+      <div class="limit-card">
+        <h4>Constant Volatility</h4>
+        <p>Real volatility changes over time and depends on the strike price. This creates the famous "volatility smile/skew." The model underprices deep out-of-the-money puts.</p>
+      </div>
+      <div class="limit-card">
+        <h4>Log-Normal Returns</h4>
+        <p>Real returns have fat tails &mdash; extreme moves happen far more often than the Gaussian model predicts. Black Monday (1987) was a &gt;20&sigma; event under the model.</p>
+      </div>
+      <div class="limit-card">
+        <h4>Continuous Trading</h4>
+        <p>Markets close overnight. Stocks gap. You can't rebalance continuously. This introduces hedging error and discrete-time risk.</p>
+      </div>
+      <div class="limit-card">
+        <h4>No Transaction Costs</h4>
+        <p>Every rebalance incurs fees and bid-ask spread. Frequent hedging is expensive. Real delta-hedging is always a compromise between accuracy and cost.</p>
+      </div>
+      <div class="limit-card">
+        <h4>No Jumps</h4>
+        <p>GBM has continuous paths. Real stocks jump on earnings, news, and crashes. Jump-diffusion models (Merton) and stochastic volatility models (Heston) address this.</p>
+      </div>
+      <div class="limit-card">
+        <h4>Known Parameters</h4>
+        <p>The model assumes you know &sigma;. In practice, volatility is estimated from historical data or implied from market prices. This circular dependency is a fundamental issue.</p>
+      </div>
+    </div>
+    <p>
+      Despite these limitations, Black&ndash;Scholes remains the foundational framework.
+      Its concepts &mdash; risk-neutral pricing, dynamic hedging, the Greeks &mdash; are the
+      language of modern derivatives trading. More advanced models (Heston, SABR, local
+      volatility) are extensions, not replacements.
+    </p>
+
+    <div class="callout">
+      <strong>The Fokker&ndash;Planck thread:</strong> Every extension of Black&ndash;Scholes
+      has a corresponding Fokker&ndash;Planck equation. Stochastic volatility models add a
+      second diffusion dimension. Jump-diffusion models add integral terms. The FPE
+      framework unifies them all under a single mathematical umbrella.
+    </div>
+  </section>
+
+  <footer>
+    <p>An interactive guide to Black&ndash;Scholes, built on Fokker&ndash;Planck &middot; Vanilla JavaScript and Canvas</p>
+  </footer>
+
+</article>
+
+<script src="bs.js"></script>
+<script src="visualizations.js"></script>
+</body>
+</html>
